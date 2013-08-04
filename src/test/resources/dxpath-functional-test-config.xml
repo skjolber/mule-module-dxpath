@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:spring="http://www.springframework.org/schema/beans"
+      xmlns:test="http://www.mulesoft.org/schema/mule/test"
+      xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+      xmlns:dx="http://www.mulesoft.org/schema/mule/dxpath"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:mule-xml="http://www.mulesoft.org/schema/mule/xml"
+      xmlns:client="http://www.mulesoft.org/schema/mule/client"
+      xmlns:script="http://www.mulesoft.org/schema/mule/scripting"
+       
+        xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/3.2/mule.xsd
+        http://www.mulesoft.org/schema/mule/test http://www.mulesoft.org/schema/mule/test/3.2/mule-test.xsd
+        http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/3.2/mule-vm.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/3.2/mule-http.xsd
+       http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/3.2/mule-xml.xsd
+       http://www.mulesoft.org/schema/mule/client http://www.mulesoft.org/schema/mule/client/3.2/mule-client.xsd
+       http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+        http://www.mulesoft.org/schema/mule/dxpath http://www.mulesoft.org/schema/mule/dxpath/3.2/mule-dxpath.xsd
+        http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/3.2/mule-scripting.xsd
+        
+       ">
+
+	<mule-xml:namespace-manager>
+		<mule-xml:namespace prefix="b" uri="http://urn.indoor.bandy/v1.0"/>
+		<mule-xml:namespace prefix="p" uri="http://urn.indoor.bandy/player/v1.0"/>
+	</mule-xml:namespace-manager>
+	
+    <flow name="noNamespace">
+	    <test:component>
+		    <test:return-data file="xml/noNamespace1.xml"/>
+		</test:component>
+		<mule-xml:xml-to-dom-transformer returnClass="org.w3c.dom.Document"/>
+
+	    <message-properties-transformer scope="invocation">
+	        <add-message-property key="playerName" value="Thomas"/>
+	    </message-properties-transformer>
+
+		<dx:dxpath expression="/team/players/player/text() = $playerName" resultType="BOOLEAN">
+			<dx:variable  key="playerName" value="#[header:invocation:playerName]"/>
+		</dx:dxpath>
+		
+    </flow>
+    
+    <flow name="defaultNamespace">
+	    <test:component>
+		    <test:return-data file="xml/defaultNamespace1.xml"/>
+		</test:component>
+		<mule-xml:xml-to-dom-transformer returnClass="org.w3c.dom.Document"/>
+
+	    <message-properties-transformer scope="invocation">
+	        <add-message-property key="playerName" value="Thomas"/>
+	    </message-properties-transformer>
+
+		<dx:dxpath expression="/b:team/b:players/b:player/text() = $playerName" resultType="BOOLEAN">
+			<dx:variable  key="playerName" value="#[header:invocation:playerName]"/>
+		</dx:dxpath>
+		
+    </flow>
+
+    <flow name="singleNamespace">
+	    <test:component>
+		    <test:return-data file="xml/singleNamespace1.xml"/>
+		</test:component>
+		<mule-xml:xml-to-dom-transformer returnClass="org.w3c.dom.Document"/>
+
+	    <message-properties-transformer scope="invocation">
+	        <add-message-property key="playerName" value="Thomas"/>
+	    </message-properties-transformer>
+
+		<dx:dxpath expression="/b:team/b:players/b:player/text() = $playerName" resultType="BOOLEAN">
+			<dx:variable  key="playerName" value="#[header:invocation:playerName]"/>
+		</dx:dxpath>
+		
+    </flow>
+
+    <flow name="multipleNamespace">
+	    <test:component>
+		    <test:return-data file="xml/multipleNamespace1.xml"/>
+		</test:component>
+		<mule-xml:xml-to-dom-transformer returnClass="org.w3c.dom.Document"/>
+
+	    <message-properties-transformer scope="invocation">
+	        <add-message-property key="playerName" value="Thomas"/>
+	    </message-properties-transformer>
+
+		<dx:dxpath expression="/b:team/b:players/p:player/text() = $playerName" resultType="BOOLEAN">
+			<dx:variable  key="playerName" value="#[header:invocation:playerName]"/>
+		</dx:dxpath>
+		
+    </flow>
+    
+    <flow name="resultTypeString">
+	    <test:component>
+		    <test:return-data file="xml/noNamespace1.xml"/>
+		</test:component>
+		<mule-xml:xml-to-dom-transformer returnClass="org.w3c.dom.Document"/>
+
+		<dx:dxpath expression="/team/players/player[1]/text()" resultType="STRING"/>
+		
+    </flow>
+
+    <flow name="resultTypeDefault">
+	    <test:component>
+		    <test:return-data file="xml/noNamespace1.xml"/>
+		</test:component>
+		<mule-xml:xml-to-dom-transformer returnClass="org.w3c.dom.Document"/>
+
+		<dx:dxpath expression="/team/players/player[1]/text()"/>
+		
+    </flow>
+    
+    <flow name="resultTypeNode">
+	    <test:component>
+		    <test:return-data file="xml/noNamespace1.xml"/>
+		</test:component>
+		<mule-xml:xml-to-dom-transformer returnClass="org.w3c.dom.Document"/>
+
+		<dx:dxpath expression="/team/players/player[1]" resultType="NODE"/>
+
+		<!-- now make an xpath query to the current node -->
+		<dx:dxpath expression="./text() = 'Magnus'" resultType="BOOLEAN"/>
+		
+    </flow>    
+    <flow name="nullPayload">
+		<enricher target="#[header:invocation:playerCount]">
+			<processor-chain>
+				<script:transformer>
+				    <script:script engine="groovy">
+				        <script:text>
+				            return new java.lang.Integer("1");
+				        </script:text>
+				    </script:script>
+				</script:transformer>
+			</processor-chain>
+		</enricher>
+
+		<dx:dxpath expression="string(number($playerCount)) != 'NaN'" resultType="BOOLEAN">
+			<dx:variable key="playerCount" value="#[header:invocation:playerCount]"/>
+		</dx:dxpath>
+		
+    </flow>
+    
+</mule>

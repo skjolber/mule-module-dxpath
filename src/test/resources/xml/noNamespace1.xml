@@ -1,0 +1,9 @@
+<team>
+	<coach>Thomas</coach>
+	<players>
+		<player>Magnus</player>
+		<player>Thomas</player>
+		<player>Knut</player>
+		<player subsitute="true">David</player>
+	</players>
+</team>

@@ -1,0 +1,9 @@
+<b:team xmlns:b="http://urn.indoor.bandy/v1.0">
+	<b:coach>Thomas</b:coach>
+	<b:players xmlns:p="http://urn.indoor.bandy/player/v1.0">
+		<p:player>Magnus</p:player>
+		<p:player>Thomas</p:player>
+		<p:player>Knut</p:player>
+		<p:player subsitute="true">David</p:player>
+	</b:players>
+</b:team>

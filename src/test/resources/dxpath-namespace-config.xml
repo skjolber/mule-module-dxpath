@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:dxpath="http://www.mulesoft.org/schema/mule/dxpath"
+    xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/3.2/mule.xsd
+        http://www.mulesoft.org/schema/mule/dxpath http://www.mulesoft.org/schema/mule/dxpath/3.2/mule-dxpath.xsd
+        
+        ">
+
+
+
+</mule>

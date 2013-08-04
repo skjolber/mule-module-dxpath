@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<xsd:schema xmlns="http://www.mulesoft.org/schema/mule/dxpath"
+	xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:mule="http://www.mulesoft.org/schema/mule/core"
+	xmlns:schemadoc="http://www.mulesoft.org/schema/mule/schemadoc"
+	targetNamespace="http://www.mulesoft.org/schema/mule/dxpath"
+	elementFormDefault="qualified" attributeFormDefault="unqualified"
+	xmlns:spring="http://www.springframework.org/schema/beans">
+
+	<xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+	<xsd:import namespace="http://www.mulesoft.org/schema/mule/core"
+		schemaLocation="http://www.mulesoft.org/schema/mule/core/3.2/mule.xsd" />
+	<xsd:import namespace="http://www.mulesoft.org/schema/mule/schemadoc"
+		schemaLocation="http://www.mulesoft.org/schema/mule/schemadoc/3.2/mule-schemadoc.xsd" />
+	<xsd:import namespace="http://www.springframework.org/schema/beans"
+		schemaLocation="http://www.springframework.org/schema/beans/spring-beans-3.1.xsd" />
+
+	<xsd:annotation>
+		<xsd:documentation>This project is located at https://github.com/skjolber/mule-module-dxpath.</xsd:documentation>
+		<xsd:appinfo>
+			<schemadoc:short-name>dxpath</schemadoc:short-name>
+			<schemadoc:page-title>Dynamic XPath Module</schemadoc:page-title>
+		</xsd:appinfo>
+	</xsd:annotation>
+
+	<xsd:complexType name="xmlTransformerType">
+		<xsd:complexContent>
+			<xsd:extension base="mule:abstractTransformerType">
+				<xsd:attribute name="outputEncoding" type="xsd:string" />
+			</xsd:extension>
+		</xsd:complexContent>
+	</xsd:complexType>
+
+	<xsd:complexType name="dxpathTransformerType">
+		<xsd:complexContent>
+			<xsd:extension base="xmlTransformerType">
+				<xsd:sequence>
+					<xsd:element name="variable" type="spring:entryType"
+						minOccurs="0" maxOccurs="unbounded">
+						<xsd:annotation>
+							<xsd:documentation>A property that wil be made available to the
+								transform context. Expression Evaluators can be used to grab
+								these properties from the message at runtime.
+							</xsd:documentation>
+						</xsd:annotation>
+					</xsd:element>
+				</xsd:sequence>
+				<xsd:attribute name="expression" type="xsd:string"
+					use="required">
+					<xsd:annotation>
+						<xsd:documentation>
+						</xsd:documentation>
+					</xsd:annotation>
+				</xsd:attribute>
+				<xsd:attribute name="resultType" type="xpathResultType">
+					<xsd:annotation>
+						<xsd:documentation>
+							The XPath result type (e.g. STRING or NODE).
+						</xsd:documentation>
+					</xsd:annotation>
+				</xsd:attribute>
+			</xsd:extension>
+		</xsd:complexContent>
+	</xsd:complexType>
+
+	<xsd:simpleType name="xpathResultType">
+        <xsd:restriction base="xsd:string">
+            <xsd:enumeration value="NODESET" />
+            <xsd:enumeration value="NODE" />
+            <xsd:enumeration value="STRING" />
+            <xsd:enumeration value="BOOLEAN" />
+            <xsd:enumeration value="NUMBER" />
+        </xsd:restriction>
+    </xsd:simpleType>
+
+	<xsd:element name="dxpath" type="dxpathTransformerType"
+		substitutionGroup="mule:abstract-transformer">
+		<xsd:annotation>
+			<xsd:documentation>The XSLT transformer uses XSLT to transform the
+				message payload. Transformation objects are pooled for better
+				performance. You can set transformation context properties on the
+				transformer and can pull these properties from the message using
+				Expression Evaluators.
+			</xsd:documentation>
+		</xsd:annotation>
+	</xsd:element>
+
+
+</xsd:schema>
