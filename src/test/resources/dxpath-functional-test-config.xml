@@ -38,7 +38,7 @@
 	        <add-message-property key="playerName" value="Thomas"/>
 	    </message-properties-transformer>
 
-		<dx:dxpath expression="/team/players/player/text() = $playerName" resultType="BOOLEAN">
+		<dx:dxpath expression="/team/players/player/text() = $playerName" resultType="BOOLEAN" maxIdleTransformers="1" maxActiveTransformers="1">
 			<dx:variable  key="playerName" value="#[header:invocation:playerName]"/>
 		</dx:dxpath>
 		

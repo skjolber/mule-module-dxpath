@@ -23,6 +23,9 @@ import java.util.Hashtable;
 
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.namespace.QName;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpression;
@@ -31,6 +34,9 @@ import javax.xml.xpath.XPathFactory;
 import javax.xml.xpath.XPathFactoryConfigurationException;
 import javax.xml.xpath.XPathVariableResolver;
 
+import org.mule.api.lifecycle.InitialisationException;
+import org.mule.config.i18n.MessageFactory;
+import org.w3c.dom.Document;
 import org.xml.sax.InputSource;
 
 // http://stackoverflow.com/questions/5663285/how-to-use-java-string-variables-inside-xpath-query/5664394#5664394
@@ -41,20 +47,47 @@ public class DxOperator {
     protected XPathFactory xPathFactory;
 
     private Hashtable<String, XPathExpression> compiled = new Hashtable<String, XPathExpression>();
+    private DxVariableResolver variableResolver;
+	private Document nullPayloadDocument;
 
+    private void initEmptyDocument() throws ParserConfigurationException {
+		// create an empty document for null payloads / instances where the xpath expression itself does not need any document
+		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+
+		factory.setNamespaceAware(true);
+		DocumentBuilder builder = factory.newDocumentBuilder();
+		
+		nullPayloadDocument = builder.newDocument();
+    }
+    
     protected void initFactory() throws XPathFactoryConfigurationException {
         xPathFactory = XPathFactory.newInstance(XPathConstants.DOM_OBJECT_MODEL);
     }
 
-    protected void initXPath(NamespaceContext context, XPathVariableResolver xPathVariableResolver) {
+    protected void initXPath(NamespaceContext context, DxVariableResolver variableResolver) {
         xPath = xPathFactory.newXPath();
         xPath.setNamespaceContext(context);
-		xPath.setXPathVariableResolver(xPathVariableResolver);
+		xPath.setXPathVariableResolver(variableResolver);
     }
 
-    public DxOperator(NamespaceContext context, XPathVariableResolver xPathVariableResolver) throws XPathFactoryConfigurationException {
+    public DxOperator(NamespaceContext context, DxVariableResolver variableResolver) throws XPathFactoryConfigurationException, ParserConfigurationException {
+    	this.variableResolver = variableResolver; 
         initFactory();
-        initXPath(context, xPathVariableResolver);
+        initXPath(context, variableResolver);
+        initEmptyDocument();
+    }
+    
+    public DxVariableResolver getVariableResolver() {
+		return variableResolver;
+	}
+
+    public Object evaluateNull(String expression, QName value) throws XPathExpressionException {
+
+        // create an XPath expression - http://www.zvon.org/xxl/XPathTutorial/General/examples.html
+        XPathExpression findStatements = compile(expression);
+
+        // execute the XPath expression against the document
+        return findStatements.evaluate(nullPayloadDocument, value);
     }
 
     public Object evaluate(Object sourceDoc, String expression, QName value) throws XPathExpressionException {

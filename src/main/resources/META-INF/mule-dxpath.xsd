@@ -58,6 +58,8 @@
 						</xsd:documentation>
 					</xsd:annotation>
 				</xsd:attribute>
+				<xsd:attribute name="maxIdleTransformers" type="mule:substitutableInt"/>
+				<xsd:attribute name="maxActiveTransformers" type="mule:substitutableInt"/>
 			</xsd:extension>
 		</xsd:complexContent>
 	</xsd:complexType>

@@ -19,15 +19,18 @@
 
 package org.mule.module.dxpath;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
 import javax.xml.namespace.QName;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpressionException;
 
+import org.apache.commons.pool.BasePoolableObjectFactory;
+import org.apache.commons.pool.impl.GenericObjectPool;
 import org.mule.api.MuleMessage;
 import org.mule.api.expression.ExpressionRuntimeException;
 import org.mule.api.lifecycle.InitialisationException;
@@ -40,7 +43,6 @@ import org.mule.module.xml.util.NamespaceManager;
 import org.mule.transformer.AbstractMessageTransformer;
 import org.mule.transformer.types.DataTypeFactory;
 import org.mule.transport.NullPayload;
-import org.w3c.dom.Document;
 import org.xml.sax.InputSource;
 
 public class DxTransformer extends AbstractMessageTransformer {
@@ -51,15 +53,31 @@ public class DxTransformer extends AbstractMessageTransformer {
 		NODESET, NODE, STRING, BOOLEAN, NUMBER
 	}
 
-	private volatile DxOperator operator;
-	private volatile DxVariableResolver variableResolver;
+    // keep at least 1 XSLT Transformer ready by default
+    private static final int MIN_IDLE_TRANSFORMERS = 1;
+    // keep max. 32 XSLT Transformers around by default
+    private static final int MAX_IDLE_TRANSFORMERS = 32;
+    // MAX_IDLE is also the total limit
+    private static final int MAX_ACTIVE_TRANSFORMERS = MAX_IDLE_TRANSFORMERS;
+
+    protected final GenericObjectPool transformerPool;
+    
 	private volatile String expression;
 	private volatile QName resultType;
-	private volatile Document nullPayloadDocument;
 	
 	private volatile Map<String, Object> contextProperties;
+	
+	private volatile String[] keys;
+	private volatile Object[] values;
 
 	public DxTransformer() {
+		super();
+		
+		transformerPool = new GenericObjectPool(new PooledDxTransformerFactory());
+        transformerPool.setMinIdle(MIN_IDLE_TRANSFORMERS);
+        transformerPool.setMaxIdle(MAX_IDLE_TRANSFORMERS);
+        transformerPool.setMaxActive(MAX_ACTIVE_TRANSFORMERS);
+
 		registerSourceType(DataTypeFactory.create(org.w3c.dom.Node.class));
 		registerSourceType(DataTypeFactory.create(InputSource.class));
 		registerSourceType(DataTypeFactory.create(NullPayload.class));
@@ -71,48 +89,28 @@ public class DxTransformer extends AbstractMessageTransformer {
 	public void initialise() throws InitialisationException {
 		super.initialise();
 
-		NamespaceManager namespaceManager = null;
-		try {
-			namespaceManager = muleContext.getRegistry().lookupObject(NamespaceManager.class);
-		} catch (RegistrationException e) {
-			throw new ExpressionRuntimeException(CoreMessages.failedToLoad("NamespaceManager"), e);
-		}
-
 		if (expression == null) {
 			throw new InitialisationException(MessageFactory.createStaticMessage("An expression must be supplied to the Dynamic XPath Transformer"), this);
 		}
 
-		HashMap<String, String> prefixToNamespaceMap = new HashMap<String, String>();
-		if (namespaceManager != null) {
-			prefixToNamespaceMap.putAll(namespaceManager.getNamespaces());
+        try {
+        	transformerPool.addObject();
+        } catch (Throwable te) {
+        	throw new InitialisationException(te, this);
+        }
+
+        // transform context properties to thread safe alternative
+        List<String> keys = new ArrayList<String>();
+        List<Object> values = new ArrayList<Object>();
+        
+		for (Entry<String, Object> entryParameter : contextProperties.entrySet()) {
+			keys.add(entryParameter.getKey());
+			values.add(entryParameter.getValue());
 		}
 
-		MapNamespaceContext namespaceContext = new MapNamespaceContext(prefixToNamespaceMap);
-
-		variableResolver = new DxVariableResolver();
-
-		try {
-			operator = new DxOperator(namespaceContext, variableResolver);
-
-			operator.compile(expression);
-		} catch (Exception e) {
-			throw new InitialisationException(MessageFactory.createStaticMessage("Problem initializing xpath"), e, this);
-		}
-
-		try {
-			// create an empty document for null payloads / instances where the xpath expression itself does not need any document
-			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-	
-			factory.setNamespaceAware(true);
-			DocumentBuilder builder = factory.newDocumentBuilder();
-			
-			nullPayloadDocument = builder.newDocument();
-		} catch (Exception e) {
-			throw new InitialisationException(MessageFactory.createStaticMessage("Problem initializing xpath"), e, this);
-		}
-		
-
-	}
+		this.keys = keys.toArray(new String[keys.size()]);
+		this.values = values.toArray(new String[values.size()]);
+	} 
 
 	/**
 	 * @return Returns the expression.
@@ -190,32 +188,127 @@ public class DxTransformer extends AbstractMessageTransformer {
 
 	@Override
 	public Object transformMessage(MuleMessage message, String putputEncoding) throws TransformerException {
-		Object src = message.getPayload();
+		
 		try {
+			DxOperator operator = null;
+			try {
+				operator = (DxOperator) transformerPool.borrowObject();
+				bindParameters(operator, message);
 
-			if (contextProperties != null) {
-				// resolve parameters dynamically
-				for (Entry<String, Object> entryParameter : contextProperties.entrySet()) {
-					String key = entryParameter.getKey();
-
-					Object value = evaluateTransformParameter(key, entryParameter.getValue(), message);
-					
-					variableResolver.newVariable(key, value);
+				Object src = message.getPayload();
+				try {
+					if (src instanceof InputSource) {
+						return operator.evaluate((InputSource) src, expression, resultType);
+					} else if (src instanceof NullPayload) {
+						return operator.evaluateNull(expression, resultType);
+					} else {
+						return operator.evaluate(src, expression, resultType);
+					}
+				} catch (Exception e) {
+					throw new TransformerException(this, e);
 				}
-			}
-
-			if (src instanceof InputSource) {
-				return operator.evaluate((InputSource) src, expression, resultType);
-			} else if (src instanceof NullPayload) {
-				return operator.evaluate(nullPayloadDocument, expression, resultType);
-			} else {
-				return operator.evaluate(src, expression, resultType);
+			} finally {
+				if(operator != null) {
+					unbindParameters(operator);
+					transformerPool.returnObject(operator);
+				}
 			}
 		} catch (Exception e) {
 			throw new TransformerException(this, e);
-		} finally {
-			variableResolver.clear();
+        }
+	}
+	
+	protected void bindParameters(DxOperator operator, MuleMessage message) throws TransformerException, XPathExpressionException {
+		operator.compile(expression);
+
+		DxVariableResolver variableResolver = operator.getVariableResolver();
+		if (contextProperties != null) {
+			// resolve parameters dynamically
+			for(int i = 0; i < keys.length; i++) {
+				Object value = evaluateTransformParameter(keys[i], values[i], message);
+				
+				variableResolver.newVariable(keys[i], value);
+			}
 		}
 	}
+	
+	/**
+     * Removes any parameter bindings
+     *
+     * @param transformer the transformer to remove properties from
+     */
+    protected void unbindParameters(DxOperator operator)  {
+		DxVariableResolver variableResolver = operator.getVariableResolver();
+		variableResolver.clear();
+    }
+
+    
+	/**
+     * @return The current maximum number of allowable active transformer objects in
+     *         the pool
+     */
+    public int getMaxActiveTransformers()
+    {
+        return transformerPool.getMaxActive();
+    }
+
+    /**
+     * Sets the the current maximum number of active transformer objects allowed in the
+     * pool
+     *
+     * @param maxActiveTransformers New maximum size to set
+     */
+    public void setMaxActiveTransformers(int maxActiveTransformers)
+    {
+        transformerPool.setMaxActive(maxActiveTransformers);
+    }
+
+    /**
+     * @return The current maximum number of allowable idle transformer objects in the
+     *         pool
+     */
+    public int getMaxIdleTransformers()
+    {
+        return transformerPool.getMaxIdle();
+    }
+
+    /**
+     * Sets the the current maximum number of idle transformer objects allowed in the pool
+     *
+     * @param maxIdleTransformers New maximum size to set
+     */
+    public void setMaxIdleTransformers(int maxIdleTransformers)
+    {
+        transformerPool.setMaxIdle(maxIdleTransformers);
+    }
+
+	
+	protected class PooledDxTransformerFactory extends BasePoolableObjectFactory
+    {
+        @Override
+        public Object makeObject() throws Exception
+        {
+    		NamespaceManager namespaceManager = null;
+    		try {
+    			namespaceManager = muleContext.getRegistry().lookupObject(NamespaceManager.class);
+    		} catch (RegistrationException e) {
+    			throw new ExpressionRuntimeException(CoreMessages.failedToLoad("NamespaceManager"), e);
+    		}
+
+
+    		HashMap<String, String> prefixToNamespaceMap = new HashMap<String, String>();
+    		if (namespaceManager != null) {
+    			prefixToNamespaceMap.putAll(namespaceManager.getNamespaces());
+    		}
+
+    		MapNamespaceContext namespaceContext = new MapNamespaceContext(prefixToNamespaceMap);
+
+    		DxVariableResolver variableResolver = new DxVariableResolver();
+
+			DxOperator operator = new DxOperator(namespaceContext, variableResolver);
+
+			return operator;
+        }
+    }
 
 }
