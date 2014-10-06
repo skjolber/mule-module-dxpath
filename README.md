@@ -1,5 +1,6 @@
 mule-module-dxpath
 =============
+ [![Build status][mtq.png]][travis]
 
 Introduction
 ------------
@@ -71,4 +72,7 @@ Author
 [Thomas Rørvik Skjølberg](http://www.linkedin.com/in/skjolberg) is a senior software developer from Oslo, Norway, focusing on middleware and mobile applications. While doing the occational freelance project, his day job is at  [Greenbird Integration Technologies](http://www.greenbird.com). 
 
 Feel free to [get in touch](mailto:thomas.skjolberg@gmail.com) for feeback on this module, or if you require professional assistance.
+
+[travis]: https://travis-ci.org/skjolber/mule-module-dxpath
+[mtq.png]: https://travis-ci.org/skjolber/mule-module-dxpath.svg?branch=master
 
